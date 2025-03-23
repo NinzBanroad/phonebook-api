@@ -12,7 +12,7 @@ mongodbConnect();
 // Allow frontend requests using the frontend URL
 app.use(
   cors({
-    origin: 'https://phonebook-ui.onrender.com/',
+    origin: 'https://phonebook-ui.onrender.com',
     methods: 'GET,POST,PUT,DELETE',
     credentials: true, // Allow cookies & authentication headers
   })
