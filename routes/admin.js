@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const { check, validationResult } = require('express-validator');
+const cloudinary = require('../config/cloudinary');
 
 const pool = require('../config/mysql');
 
@@ -143,7 +144,7 @@ router.post(
           [result.insertId]
         );
 
-        res.json({ user: newUser[0] });
+        res.json({ user: newUser[0], msg: 'User Added Successfully!' });
       }
     } catch (err) {
       console.error(err.message);
@@ -227,6 +228,29 @@ router.delete('/delete-user/:UserID', auth, async (req, res) => {
 
     if (result.affectedRows === 0) {
       return res.status(400).json({ errors: [{ msg: 'User not found' }] });
+    }
+
+    // Check if Contact exists in tbl_Contacts
+    const [contactExist] = await pool.query(
+      'SELECT * FROM tbl_Contacts WHERE UserID = ?',
+      [req.params.UserID]
+    );
+    if (contactExist.length > 0) {
+      // delete the contact photo in cloudinary
+      contactExist.map(
+        async (contact) =>
+          await cloudinary.uploader.destroy(contact.ContactPhoto)
+      );
+
+      // delete the contact in MySQL
+      await pool.query('DELETE FROM tbl_Contacts WHERE UserID = ?', [
+        req.params.UserID,
+      ]);
+
+      // delete the users shared contacts in MySQL
+      await pool.query('DELETE FROM tbl_SharedContacts WHERE UserID = ?', [
+        req.params.UserID,
+      ]);
     }
 
     res.json({ message: 'User deleted successfully' });

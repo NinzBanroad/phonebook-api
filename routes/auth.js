@@ -167,19 +167,19 @@ router.post(
           .json({ errors: [{ msg: 'Invalid Credentials' }] });
       }
 
-      // Check if Status is approved or pending
-      if (rows[0].Status === 'pending') {
-        return res
-          .status(400)
-          .json({ errors: [{ msg: 'Please wait for Admin Approval' }] });
-      }
-
       const isMatch = await bcrypt.compare(password, rows[0].Password);
 
       if (!isMatch) {
         return res
           .status(400)
           .json({ errors: [{ msg: 'Invalid Credentials' }] });
+      }
+
+      // Check if Status is approved or pending
+      if (rows[0].Status === 'pending') {
+        return res
+          .status(400)
+          .json({ errors: [{ msg: 'Please wait for Admin Approval' }] });
       }
 
       const payload = {
@@ -194,7 +194,7 @@ router.post(
         { expiresIn: '5 days' },
         (err, token) => {
           if (err) throw err;
-          res.json({ token });
+          res.json({ token, msg: 'Signin Successfully!' });
         }
       );
     } catch (err) {
