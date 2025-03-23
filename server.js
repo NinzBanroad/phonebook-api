@@ -9,18 +9,14 @@ const app = express();
 //Connect to MongoDB Database
 mongodbConnect();
 
-//Connect to MySQL Database
-// app.get('/test-db', async (req, res) => {
-//   try {
-//     const [rows] = await pool.query('SELECT 1 + 1 AS result');
-//     res.json({ message: 'DATABASE connected!', result: rows[0].result });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-// Allow frontend requests
-app.use(cors());
+// Allow frontend requests using the frontend URL
+app.use(
+  cors({
+    origin: 'https://phonebook-ui.onrender.com/',
+    methods: 'GET,POST,PUT,DELETE',
+    credentials: true, // Allow cookies & authentication headers
+  })
+);
 
 // Init Middleware
 app.use(express.json());
