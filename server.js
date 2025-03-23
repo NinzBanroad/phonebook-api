@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const mongodbConnect = require('./config/mongodb');
+require('dotenv').config();
 const pool = require('./config/mysql');
 
 const app = express();

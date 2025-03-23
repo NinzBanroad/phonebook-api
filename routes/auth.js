@@ -5,6 +5,7 @@ const auth = require('../middleware/auth');
 const jwt = require('jsonwebtoken');
 const config = require('config');
 const { check, validationResult } = require('express-validator');
+require('dotenv').config();
 
 const pool = require('../config/mysql');
 
@@ -123,9 +124,7 @@ router.post(
         },
       };
 
-      const jwtSecret = config.has('jwtSecret')
-        ? config.get('jwtSecret')
-        : process.env.jwtSecret;
+      const jwtSecret = process.env.jwtSecret;
 
       jwt.sign(payload, jwtSecret, { expiresIn: '5 days' }, (err, token) => {
         if (err) throw err;
@@ -187,9 +186,7 @@ router.post(
         },
       };
 
-      const jwtSecret = config.has('jwtSecret')
-        ? config.get('jwtSecret')
-        : process.env.jwtSecret;
+      const jwtSecret = process.env.jwtSecret;
 
       jwt.sign(payload, jwtSecret, { expiresIn: '5 days' }, (err, token) => {
         if (err) throw err;
