@@ -123,15 +123,14 @@ router.post(
         },
       };
 
-      jwt.sign(
-        payload,
-        config.get('jwtSecret'),
-        { expiresIn: '5 days' },
-        (err, token) => {
-          if (err) throw err;
-          res.json({ token });
-        }
-      );
+      const jwtSecret = config.has('jwtSecret')
+        ? config.get('jwtSecret')
+        : process.env.jwtSecret;
+
+      jwt.sign(payload, jwtSecret, { expiresIn: '5 days' }, (err, token) => {
+        if (err) throw err;
+        res.json({ token });
+      });
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Server error');
@@ -188,15 +187,14 @@ router.post(
         },
       };
 
-      jwt.sign(
-        payload,
-        config.get('jwtSecret'),
-        { expiresIn: '5 days' },
-        (err, token) => {
-          if (err) throw err;
-          res.json({ token, msg: 'Signin Successfully!' });
-        }
-      );
+      const jwtSecret = config.has('jwtSecret')
+        ? config.get('jwtSecret')
+        : process.env.jwtSecret;
+
+      jwt.sign(payload, jwtSecret, { expiresIn: '5 days' }, (err, token) => {
+        if (err) throw err;
+        res.json({ token, msg: 'Signin Successfully!' });
+      });
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Server error');

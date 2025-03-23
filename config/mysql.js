@@ -1,6 +1,8 @@
 const mysql = require('mysql2/promise');
 const config = require('config');
-const db = config.get('DATABASE_URL');
+const db = config.has('DATABASE_URL')
+  ? config.get('DATABASE_URL')
+  : process.env.DATABASE_URL;
 
 const pool = mysql.createPool(db);
 

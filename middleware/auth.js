@@ -12,7 +12,10 @@ module.exports = function (req, res, next) {
 
   // Verify token
   try {
-    jwt.verify(token, config.get('jwtSecret'), (error, decoded) => {
+    const jwtSecret = config.has('jwtSecret')
+      ? config.get('jwtSecret')
+      : process.env.jwtSecret;
+    jwt.verify(token, jwtSecret, (error, decoded) => {
       if (error) {
         return res.status(401).json({ msg: 'Token is not valid' });
       } else {
