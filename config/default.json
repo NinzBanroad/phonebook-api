@@ -1,8 +1,0 @@
-{
-    "mongoURI": "mongodb+srv://anonimitylove20:1234@mern-phonebook-db.s71ym.mongodb.net/?retryWrites=true&w=majority&appName=mern-phonebook-db",
-    "DATABASE_URL": "mysql://root:hMyXKdFmpOOTrKDRLcvFaPdoUZpDlMMt@yamanote.proxy.rlwy.net:11962/railway",
-    "jwtSecret": "phonebook-secret-token",
-    "CLOUDINARY_CLOUD_NAME": "dnrytcwn6", 
-    "CLOUDINARY_API_KEY": "995737564171347", 
-    "CLOUDINARY_API_SECRET": "XRrh5KZkDvbvulImuTItb__B81A"
-}
