@@ -6,20 +6,19 @@ const pool = require('./config/mysql');
 
 const app = express();
 
-//Connect to MongoDB Database
-mongodbConnect();
+// Init Middleware
+app.use(express.json());
 
 // Allow frontend requests using the frontend URL
 app.use(
   cors({
-    origin: 'https://phonebook-ui.onrender.com',
-    methods: 'GET,POST,PUT,DELETE',
+    origin: process.env.FRONTEND_LINK,
     credentials: true, // Allow cookies & authentication headers
   })
 );
 
-// Init Middleware
-app.use(express.json());
+//Connect to MongoDB Database
+mongodbConnect();
 
 //Define Routes
 app.use('/api/auth', require('./routes/auth'));

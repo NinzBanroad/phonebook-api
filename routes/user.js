@@ -121,7 +121,6 @@ router.post('/share-contacts-with', auth, async (req, res) => {
   }
 
   const { UserID, ContactID, sharedWith } = req.body;
-  console.log(req.body);
 
   if (sharedWith.length === 0) {
     return res.status(400).json({
