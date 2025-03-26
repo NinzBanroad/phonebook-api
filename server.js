@@ -13,6 +13,7 @@ app.use(express.json());
 app.use(
   cors({
     origin: process.env.FRONTEND_LINK,
+    methods: 'GET,POST,PUT,DELETE',
     credentials: true, // Allow cookies & authentication headers
   })
 );
