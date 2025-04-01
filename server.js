@@ -6,16 +6,11 @@ const pool = require('./config/mysql');
 
 const app = express();
 
+// Allow frontend requests
+app.use(cors());
+
 // Init Middleware
 app.use(express.json());
-
-// Allow frontend requests using the frontend URL
-app.use(
-  cors({
-    origin: process.env.FRONTEND_LINK,
-    credentials: true, // Allow cookies & authentication headers
-  })
-);
 
 //Connect to MongoDB Database
 mongodbConnect();

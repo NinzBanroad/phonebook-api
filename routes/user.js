@@ -8,6 +8,7 @@ const upload = require('../middleware/multer');
 
 const pool = require('../config/mysql');
 const sharedContactsWith = require('../models/SharedContactsWith');
+const SharedContactsWith = require('../models/SharedContactsWith');
 
 // @route    GET api/user/all-active-users
 // @desc     Get all users
@@ -87,6 +88,28 @@ router.get('/all-contacts/:UserID', auth, async (req, res) => {
       [req.params.UserID]
     );
 
+    const userContactIDs = finalContacts.map((rows) => rows.ContactID);
+    const sharedContacts = await SharedContactsWith.find({
+      ContactID: { $in: userContactIDs },
+    });
+
+    // Create a Map of finalContacts for fast lookup
+    const finalContactsMap = new Map(
+      finalContacts.map((contact) => [contact.ContactID, contact])
+    );
+
+    // Iterate over sharedContacts and update finalContacts if a match is found
+    sharedContacts.forEach((sharedContact) => {
+      if (finalContactsMap.has(sharedContact.ContactID)) {
+        finalContactsMap.get(sharedContact.ContactID).sharedWith = [
+          ...sharedContact.sharedWith,
+        ];
+      }
+    });
+
+    // Convert the Map back to an array
+    const updatedFinalContacts = Array.from(finalContactsMap.values());
+
     // Check if there are contacts that were shared to that user if none proceed to showing the finalContacts
     if (rowsContactID.length != 0) {
       // map the rowsContactID to retrieve the array of ids
@@ -100,11 +123,11 @@ router.get('/all-contacts/:UserID', auth, async (req, res) => {
 
       // push to the finalContacts
       results.map((result) => {
-        finalContacts.push(result);
+        updatedFinalContacts.push(result);
       });
     }
 
-    res.json(finalContacts);
+    res.json(updatedFinalContacts);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');
@@ -122,12 +145,6 @@ router.post('/share-contacts-with', auth, async (req, res) => {
 
   const { UserID, ContactID, sharedWith } = req.body;
 
-  if (sharedWith.length === 0) {
-    return res.status(400).json({
-      errors: [{ msg: 'Please select users to share this contact with' }],
-    });
-  }
-
   //Check if valid User ID
   if (!UserID || isNaN(UserID)) {
     return res.status(400).json({ errors: [{ msg: 'Invalid ID format' }] });
@@ -142,37 +159,61 @@ router.post('/share-contacts-with', auth, async (req, res) => {
     return res.status(404).json({ errors: [{ msg: 'User ID not found' }] });
   }
 
-  // will use to check the ContactID and UserIDs if existed in the SharedContacts
-  const sharedUserIDs = sharedWith.map((shareduserid) => shareduserid);
-  const [results] = await pool.query(
-    `SELECT * FROM tbl_SharedContacts WHERE ContactID = ? AND UserID IN (?)`,
-    [ContactID, sharedUserIDs]
-  );
-
-  if (results.length !== 0) {
-    await pool.query(
-      'DELETE FROM tbl_SharedContacts WHERE ContactID = ? AND UserID IN (?)',
-      [ContactID, sharedUserIDs]
-    );
+  //Check if valid Contact ID
+  if (!ContactID || isNaN(ContactID)) {
+    return res.status(400).json({ errors: [{ msg: 'Invalid ID format' }] });
   }
 
-  // map all the shared UserIDs and the ContactID that is being shared
-  const sharedUserIDsWithContact = sharedWith.map((shareduserid) => [
-    ContactID,
-    shareduserid,
-  ]);
+  if (sharedWith.length === 0) {
+    const sharedContacts = await sharedContactsWith.findOne({
+      ContactID: Number(ContactID),
+    });
 
-  // Add shared contacts using the IDs of the users and Contact ID of the Contact
-  const query = `INSERT INTO tbl_SharedContacts (ContactID, UserID) VALUES ?`;
-  await pool.query(query, [sharedUserIDsWithContact]);
+    await pool.query(
+      'DELETE FROM tbl_SharedContacts WHERE ContactID = ? AND UserID IN (?)',
+      [ContactID, sharedContacts.sharedWith]
+    );
 
-  await sharedContactsWith.findOneAndUpdate(
-    { ContactID: ContactID },
-    { $set: { UserID, ContactID, sharedWith } },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
-  );
+    await sharedContactsWith.findOneAndUpdate(
+      { ContactID: ContactID },
+      { $set: { UserID, ContactID, sharedWith } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
 
-  res.json({ msg: 'Contacts shared successfully!' });
+    res.json({ msg: 'Unshare Contact Successful' });
+  } else {
+    // will use to check the ContactID and UserIDs if existed in the SharedContacts
+    const sharedUserIDs = sharedWith.map((shareduserid) => shareduserid);
+    const [results] = await pool.query(
+      `SELECT * FROM tbl_SharedContacts WHERE ContactID = ? AND UserID IN (?)`,
+      [ContactID, sharedUserIDs]
+    );
+
+    if (results.length !== 0) {
+      await pool.query(
+        'DELETE FROM tbl_SharedContacts WHERE ContactID = ? AND UserID IN (?)',
+        [ContactID, sharedUserIDs]
+      );
+    }
+
+    // map all the shared UserIDs and the ContactID that is being shared
+    const sharedUserIDsWithContact = sharedWith.map((shareduserid) => [
+      ContactID,
+      shareduserid,
+    ]);
+
+    // Add shared contacts using the IDs of the users and Contact ID of the Contact
+    const query = `INSERT INTO tbl_SharedContacts (ContactID, UserID) VALUES ?`;
+    await pool.query(query, [sharedUserIDsWithContact]);
+
+    await sharedContactsWith.findOneAndUpdate(
+      { ContactID: ContactID },
+      { $set: { UserID, ContactID, sharedWith } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({ msg: 'Share Contact Successful' });
+  }
 });
 
 // Create Contacts
@@ -196,6 +237,32 @@ router.post(
 
     const { firstname, lastname, contactnumber, email } = req.body;
 
+    //Check if valid ID
+    if (!req.params.UserID || isNaN(req.params.UserID)) {
+      return res.status(400).json({ errors: [{ msg: 'Invalid ID format' }] });
+    }
+
+    // Check if UserID exists in tbl_Users
+    const [userExists] = await pool.query(
+      'SELECT UserID FROM tbl_Users WHERE UserID = ?',
+      [req.params.UserID]
+    );
+    if (userExists.length === 0) {
+      return res.status(404).json({ errors: [{ msg: 'User ID not found' }] });
+    }
+
+    // Check if ContactNumber exists in tbl_Contacts
+    const [contactNumberExists] = await pool.query(
+      'SELECT * FROM tbl_Contacts WHERE ContactNumber = ? AND UserID = ?',
+      [contactnumber, req.params.UserID]
+    );
+    if (contactNumberExists.length > 0) {
+      return res
+        .status(404)
+        .json({ errors: [{ msg: 'Contact Number already exists' }] });
+    }
+
+    //check if there's contact photo being uploaded
     if (!req.file)
       return res
         .status(400)
@@ -208,20 +275,6 @@ router.post(
           success: false,
           message: 'Error',
         });
-      }
-
-      //Check if valid ID
-      if (!req.params.UserID || isNaN(req.params.UserID)) {
-        return res.status(400).json({ errors: [{ msg: 'Invalid ID format' }] });
-      }
-
-      // Check if UserID exists in tbl_Users
-      const [userExists] = await pool.query(
-        'SELECT UserID FROM tbl_Users WHERE UserID = ?',
-        [req.params.UserID]
-      );
-      if (userExists.length === 0) {
-        return res.status(404).json({ errors: [{ msg: 'User ID not found' }] });
       }
 
       try {
@@ -244,7 +297,7 @@ router.post(
 
         res.json({
           contact: newContact[0],
-          msg: 'Contact Added Successfully!',
+          msg: 'Add Contact Successful',
         });
       } catch (err) {
         res.status(400).send(err.message);
@@ -274,56 +327,142 @@ router.put(
 
     const { firstname, lastname, contactnumber, email } = req.body;
 
-    cloudinary.uploader.upload(req.file.path, async (err, result) => {
-      if (err) {
-        return res.status(500).json({
-          success: false,
-          message: 'Error',
+    //Check if valid ID
+    if (!req.params.ContactID || isNaN(req.params.ContactID)) {
+      return res.status(400).json({ errors: [{ msg: 'Invalid ID format' }] });
+    }
+
+    // Check if ContactID exists in tbl_Contacts
+    const [contactExist] = await pool.query(
+      'SELECT * FROM tbl_Contacts WHERE ContactID = ?',
+      [req.params.ContactID]
+    );
+    if (contactExist.length === 0) {
+      return res
+        .status(404)
+        .json({ errors: [{ msg: 'Contact ID not found' }] });
+    }
+
+    try {
+      if (req.file) {
+        // Delete the existing image in cloudinary
+        await cloudinary.uploader.destroy(contactExist[0].ContactPhoto);
+
+        // Upload the image
+        cloudinary.uploader.upload(req.file.path, async (err, result) => {
+          if (err) {
+            return res.status(500).json({
+              success: false,
+              message: 'Error uploading image',
+            });
+          }
+
+          if (contactExist[0].ContactNumber === contactnumber) {
+            await pool.query(
+              'UPDATE tbl_Contacts SET Firstname = ?, Lastname = ?, Email = ?, ContactNumber = ?, ContactPhoto = ? WHERE ContactID = ?',
+              [
+                firstname,
+                lastname,
+                email,
+                contactnumber,
+                result.public_id, // save the new public_id
+                req.params.ContactID,
+              ]
+            );
+
+            const [updatedContact] = await pool.query(
+              'SELECT * FROM tbl_Contacts WHERE ContactID = ?',
+              [req.params.ContactID]
+            );
+
+            res.json({
+              contact: updatedContact[0],
+              msg: 'Update Contact Successful',
+            });
+          } else {
+            // Check if ContactNumber exists in tbl_Contacts
+            const [contactNumberExists] = await pool.query(
+              'SELECT ContactNumber FROM tbl_Contacts WHERE ContactNumber = ?',
+              [contactnumber]
+            );
+            if (contactNumberExists.length > 0) {
+              return res
+                .status(404)
+                .json({ errors: [{ msg: 'Contact Number already exists' }] });
+            }
+
+            await pool.query(
+              'UPDATE tbl_Contacts SET Firstname = ?, Lastname = ?, Email = ?, ContactNumber = ?, ContactPhoto = ? WHERE ContactID = ?',
+              [
+                firstname,
+                lastname,
+                email,
+                contactnumber,
+                result.public_id, // save the new public_id
+                req.params.ContactID,
+              ]
+            );
+
+            const [updatedContact] = await pool.query(
+              'SELECT * FROM tbl_Contacts WHERE ContactID = ?',
+              [req.params.ContactID]
+            );
+
+            res.json({
+              contact: updatedContact[0],
+              msg: 'Update Contact Successful',
+            });
+          }
         });
+      } else {
+        if (contactExist[0].ContactNumber === contactnumber) {
+          // If no new image is uploaded, just update other fields
+          await pool.query(
+            'UPDATE tbl_Contacts SET Firstname = ?, Lastname = ?, Email = ?, ContactNumber = ? WHERE ContactID = ?',
+            [firstname, lastname, email, contactnumber, req.params.ContactID]
+          );
+
+          const [updatedContact] = await pool.query(
+            'SELECT * FROM tbl_Contacts WHERE ContactID = ?',
+            [req.params.ContactID]
+          );
+
+          res.json({
+            contact: updatedContact[0],
+            msg: 'Update Contact Successful',
+          });
+        } else {
+          // Check if ContactNumber exists in tbl_Contacts
+          const [contactNumberExists] = await pool.query(
+            'SELECT ContactNumber FROM tbl_Contacts WHERE ContactNumber = ?',
+            [contactnumber]
+          );
+          if (contactNumberExists.length > 0) {
+            return res
+              .status(404)
+              .json({ errors: [{ msg: 'Contact Number already exists' }] });
+          }
+          // If no new image is uploaded, just update other fields
+          await pool.query(
+            'UPDATE tbl_Contacts SET Firstname = ?, Lastname = ?, Email = ?, ContactNumber = ? WHERE ContactID = ?',
+            [firstname, lastname, email, contactnumber, req.params.ContactID]
+          );
+
+          const [updatedContact] = await pool.query(
+            'SELECT * FROM tbl_Contacts WHERE ContactID = ?',
+            [req.params.ContactID]
+          );
+
+          res.json({
+            contact: updatedContact[0],
+            msg: 'Update Contact Successful',
+          });
+        }
       }
-
-      //Check if valid ID
-      if (!req.params.ContactID || isNaN(req.params.ContactID)) {
-        return res.status(400).json({ errors: [{ msg: 'Invalid ID format' }] });
-      }
-
-      // Check if ContactID exists in tbl_Contacts
-      const [contactExist] = await pool.query(
-        'SELECT * FROM tbl_Contacts WHERE ContactID = ?',
-        [req.params.ContactID]
-      );
-      if (contactExist.length === 0) {
-        return res
-          .status(404)
-          .json({ errors: [{ msg: 'Contact ID not found' }] });
-      }
-
-      try {
-        await pool.query(
-          'UPDATE tbl_Contacts SET Firstname = ?, Lastname = ?, Email = ?, ContactNumber = ?, ContactPhoto = ? WHERE ContactID = ?',
-          [
-            firstname,
-            lastname,
-            email,
-            contactnumber,
-            result.public_id,
-            req.params.ContactID,
-          ]
-        );
-
-        const [updatedContact] = await pool.query(
-          'SELECT * FROM tbl_Contacts WHERE ContactID = ?',
-          [req.params.ContactID]
-        );
-
-        res.json({
-          contact: updatedContact[0],
-          msg: 'Contact Updated Successfully!',
-        });
-      } catch (err) {
-        res.status(400).send(err.message);
-      }
-    });
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server Error');
+    }
   }
 );
 
@@ -356,7 +495,7 @@ router.delete('/delete-contact/:ContactID', auth, async (req, res) => {
       req.params.ContactID,
     ]);
 
-    res.json({ msg: 'Contact Deleted Successfully!' });
+    res.json({ msg: 'Delete Contact Successful' });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');

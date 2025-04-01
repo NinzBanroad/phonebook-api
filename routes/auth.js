@@ -9,7 +9,7 @@ require('dotenv').config();
 const pool = require('../config/mysql');
 
 // @route    GET api/auth
-// @desc     Get user by token
+// @desc     Get user
 // @access   Private
 router.get('/', auth, async (req, res) => {
   try {
@@ -54,7 +54,7 @@ router.post(
         return res.status(400).json({ errors: [{ msg: 'Invalid Email' }] });
       }
 
-      res.json({ msg: 'Email Verified Successfully!' });
+      res.json({ msg: 'Email Verification Successful' });
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Server error');
@@ -127,7 +127,7 @@ router.post(
 
       jwt.sign(payload, jwtSecret, { expiresIn: '5 days' }, (err, token) => {
         if (err) throw err;
-        res.json({ token });
+        res.json({ token, msg: 'Password Change Successful' });
       });
     } catch (err) {
       console.error(err.message);
@@ -189,7 +189,7 @@ router.post(
 
       jwt.sign(payload, jwtSecret, { expiresIn: '5 days' }, (err, token) => {
         if (err) throw err;
-        res.json({ token, msg: 'Signin Successfully!' });
+        res.json({ token, msg: 'Signin Successful' });
       });
     } catch (err) {
       console.error(err.message);
@@ -225,7 +225,7 @@ router.post(
       if (rows[0].count > 0) {
         return res
           .status(400)
-          .json({ errors: [{ msg: 'User already exists' }] });
+          .json({ errors: [{ msg: 'Email already exists' }] });
       } else {
         const salt = await bcrypt.genSalt(10);
 
@@ -238,7 +238,7 @@ router.post(
         );
 
         res.json({
-          msg: 'Please wait for Admin Approval',
+          msg: 'Signup Successful',
         });
       }
     } catch (err) {

@@ -43,10 +43,10 @@ router.post(
           .json({ errors: [{ msg: 'Incorrect Current Password' }] });
       }
 
-      res.json({ msg: 'Current Password match' });
+      return res.json({ msg: 'Current Password match' });
     } catch (err) {
       console.error(err.message);
-      res.status(500).send('Server error');
+      return res.status(500).send('Server error');
     }
   }
 );
@@ -58,10 +58,10 @@ router.get('/all-users', auth, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM tbl_Users');
 
-    res.json(rows);
+    return res.json(rows);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    return res.status(500).send('Server Error');
   }
 });
 
@@ -91,10 +91,10 @@ router.put('/approve-user/:UserID', auth, async (req, res) => {
       [req.params.UserID]
     );
 
-    res.json(updatedUser[0]);
+    return res.json({ user: updatedUser[0], msg: 'Approve User Successful' });
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    return res.status(500).send('Server Error');
   }
 });
 
@@ -144,11 +144,11 @@ router.post(
           [result.insertId]
         );
 
-        res.json({ user: newUser[0], msg: 'User Added Successfully!' });
+        return res.json({ user: newUser[0], msg: 'Add User Successful' });
       }
     } catch (err) {
       console.error(err.message);
-      res.status(500).send('Server Error');
+      return res.status(500).send('Server Error');
     }
   }
 );
@@ -169,12 +169,42 @@ router.put(
 
       const { email, password } = req.body;
 
-      // check if no password
+      // check if there's no password inputted
       if (!password) {
         const [checkUser] = await pool.query(
           'SELECT * FROM tbl_Users WHERE UserID = ?',
           [req.params.UserID]
         );
+
+        // check current email if no changes will save the current email and current password
+        if (checkUser[0].Email === email) {
+          await pool.query(
+            'UPDATE tbl_Users SET Email = ?, Password = ? WHERE UserID = ?',
+            [email, checkUser[0].Password, req.params.UserID]
+          );
+
+          const [updatedUser] = await pool.query(
+            'SELECT * FROM tbl_Users WHERE UserID = ?',
+            [req.params.UserID]
+          );
+
+          return res.json({
+            user: updatedUser[0],
+            msg: 'Update User Successful',
+          });
+        }
+
+        // if new email will check again if it is not existing before saving the email and password
+        const [rows] = await pool.query(
+          'SELECT COUNT(*) AS count FROM tbl_Users WHERE email = ?',
+          [email]
+        );
+
+        if (rows[0].count > 0) {
+          return res
+            .status(400)
+            .json({ errors: [{ msg: 'Email already exists' }] });
+        }
 
         await pool.query(
           'UPDATE tbl_Users SET Email = ?, Password = ? WHERE UserID = ?',
@@ -186,8 +216,51 @@ router.put(
           [req.params.UserID]
         );
 
-        res.json(updatedUser[0]);
+        return res.json({
+          user: updatedUser[0],
+          msg: 'Update User Successful',
+        });
       } else {
+        const [checkUser] = await pool.query(
+          'SELECT * FROM tbl_Users WHERE UserID = ?',
+          [req.params.UserID]
+        );
+
+        // check current email if no changes will save the current email and new password
+        if (checkUser[0].Email === email) {
+          // hash and update password
+          const salt = await bcrypt.genSalt(10);
+
+          const newPassword = await bcrypt.hash(password, salt);
+
+          await pool.query(
+            'UPDATE tbl_Users SET Email = ?, Password = ? WHERE UserID = ?',
+            [email, newPassword, req.params.UserID]
+          );
+
+          const [updatedUser] = await pool.query(
+            'SELECT * FROM tbl_Users WHERE UserID = ?',
+            [req.params.UserID]
+          );
+
+          return res.json({
+            user: updatedUser[0],
+            msg: 'Update User Successful',
+          });
+        }
+
+        // if new email will check again if it is not existing before saving the email and password
+        const [rows] = await pool.query(
+          'SELECT COUNT(*) AS count FROM tbl_Users WHERE email = ?',
+          [email]
+        );
+
+        if (rows[0].count > 0) {
+          return res
+            .status(400)
+            .json({ errors: [{ msg: 'Email already exists' }] });
+        }
+        // hash and update password
         const salt = await bcrypt.genSalt(10);
 
         const newPassword = await bcrypt.hash(password, salt);
@@ -202,11 +275,14 @@ router.put(
           [req.params.UserID]
         );
 
-        res.json(updatedUser[0]);
+        return res.json({
+          user: updatedUser[0],
+          msg: 'Update User Successful',
+        });
       }
     } catch (err) {
       console.error(err.message);
-      res.status(500).send('Server Error');
+      return res.status(500).send('Server Error');
     }
   }
 );
@@ -253,10 +329,10 @@ router.delete('/delete-user/:UserID', auth, async (req, res) => {
       ]);
     }
 
-    res.json({ message: 'User deleted successfully' });
+    return res.json({ msg: 'Delete User Successful' });
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    return res.status(500).send('Server Error');
   }
 });
 
